@@ -1,0 +1,17 @@
+name: 'TexonisLlmBindings'
+description: 'llama.cpp binding'
+output: 'lib/texonis_llm_bindings_generated.dart'
+headers:
+  entry-points:
+    - 'src/llama.cpp/spm-headers/llama.h'
+  include-directives:
+    - 'src/llama.cpp/spm-headers/**.h'
+compiler-opts:
+  - "-I/usr/lib/clang/17/include"
+preamble: |
+  // ignore_for_file: always_specify_types
+  // ignore_for_file: camel_case_types
+  // ignore_for_file: non_constant_identifier_names
+comments:
+  style: any
+  length: full
