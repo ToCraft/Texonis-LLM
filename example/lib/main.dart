@@ -3,7 +3,7 @@ import 'package:texonis_llm/texonis_llm.dart';
 import 'dart:io';
 
 void main() async {
-  String modelPath = "/home/tocraft/Downloads/DistilGPT2-TinyStories.IQ3_M.gguf";
+  String modelPath = "/home/tocraft/Downloads/tinyllama-1.1b-chat-v1.0.Q2_K.gguf";
   Llama llama = Llama(modelPath, ModelParams(), ContextParams(), false, "A long time ago ");
 
   llama.stream().listen((response) {

@@ -35,13 +35,18 @@ llama_sampler_chain_params getDefaultSamplerChainParams() {
 
 llama_batch prompt(Pointer<llama_model> model, String input, bool special) {
   // tokenize
+  int nTokens;
   final promptPtr = input.toNativeUtf8().cast<Char>();
-  int nTokens = _bindings.llama_tokenize(model, promptPtr, input.length, nullptr, 0, special, special);
+  try {
+    nTokens = _bindings.llama_tokenize(model, promptPtr, input.length, nullptr, 0, true, true);
+  } finally {
+    malloc.free(promptPtr);
+  }
+
   Pointer<llama_token> tokens = malloc<llama_token>(nTokens);
   if (nTokens < 0) {
     throw LlmException("Failed to tokenize prompt!");
   }
-  
   llama_batch batch = _bindings.llama_batch_get_one(tokens, nTokens);
 
   if (tokens != nullptr) {
@@ -136,22 +141,30 @@ class LlmException implements Exception {
 
   @override
   String toString() =>
-      'LmException: $message${originalError != null ? ' $originalError' : ''}';
+      'LlmException: $message${originalError != null ? ' $originalError' : ''}';
 }
 
-const String _libName = 'texonis_llm';
 final DynamicLibrary _dylib = () {
-  if (Platform.isMacOS || Platform.isIOS) {
-    return DynamicLibrary.open('$_libName.framework/$_libName');
-  }
-  if (Platform.isAndroid || Platform.isLinux) {
-    return DynamicLibrary.open('lib$_libName.so');
-  }
-  if (Platform.isWindows) {
-    return DynamicLibrary.open('$_libName.dll');
-  }
-  throw UnsupportedError('Unknown platform: ${Platform.operatingSystem}');
+  loadLib("ggml-base");
+  loadLib("ggml-cpu");
+  loadLib("ggml");
+  return loadLib("llama");
 }();
+
+DynamicLibrary loadLib(String libName) {
+  {
+    if (Platform.isMacOS || Platform.isIOS) {
+      return DynamicLibrary.open('$libName.framework/$libName');
+    }
+    if (Platform.isAndroid || Platform.isLinux) {
+      return DynamicLibrary.open('lib$libName.so');
+    }
+    if (Platform.isWindows) {
+      return DynamicLibrary.open('$libName.dll');
+    }
+    throw UnsupportedError('Unknown platform: ${Platform.operatingSystem}');
+  }
+}
 
 final TexonisLlmBindings _bindings = TexonisLlmBindings(_dylib);
 

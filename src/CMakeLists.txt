@@ -14,16 +14,3 @@ endif()
 set(LLAMA_NATIVE OFF CACHE BOOL "llama: disable -march=native flag" FORCE)
 
 add_subdirectory(./llama.cpp)
-
-project(texonis_llm_library VERSION 0.0.1 LANGUAGES C)
-
-add_library(texonis_llm SHARED
-        "llama.cpp/src/llama.cpp"
-)
-
-set_target_properties(texonis_llm PROPERTIES
-        PUBLIC_HEADER "llama.cpp/spm-headers/llama.h"
-        OUTPUT_NAME "texonis_llm"
-)
-
-target_compile_definitions(texonis_llm PUBLIC DART_SHARED_LIB)
