@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:texonis_llm/texonis_llm.dart';
+import 'dart:io';
 
-import 'package:texonis_llm/texonis_llm.dart' as texonis_llm;
+void main() async {
+  String modelPath = "/home/tocraft/Downloads/DistilGPT2-TinyStories.IQ3_M.gguf";
+  Llama llama = Llama(modelPath, ModelParams(), ContextParams(), false, "A long time ago ");
 
-void main() {
-  runApp(const MyApp());
+  llama.stream().listen((response) {
+    stdout.write(response);
+  });
+
+  //runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -15,14 +21,11 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  late int sumResult;
-  late Future<int> sumAsyncResult;
+  late int sumResult = 0;
 
   @override
   void initState() {
     super.initState();
-    sumResult = texonis_llm.sum(1, 2);
-    sumAsyncResult = texonis_llm.sumAsync(3, 4);
   }
 
   @override
@@ -51,19 +54,7 @@ class _MyAppState extends State<MyApp> {
                   style: textStyle,
                   textAlign: TextAlign.center,
                 ),
-                spacerSmall,
-                FutureBuilder<int>(
-                  future: sumAsyncResult,
-                  builder: (BuildContext context, AsyncSnapshot<int> value) {
-                    final displayValue =
-                        (value.hasData) ? value.data : 'loading';
-                    return Text(
-                      'await sumAsync(3, 4) = $displayValue',
-                      style: textStyle,
-                      textAlign: TextAlign.center,
-                    );
-                  },
-                ),
+                spacerSmall
               ],
             ),
           ),
