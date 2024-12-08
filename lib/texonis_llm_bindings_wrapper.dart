@@ -34,39 +34,45 @@ llama_sampler_chain_params getDefaultSamplerChainParams() {
 }
 
 llama_batch prompt(Pointer<llama_model> model, String input, bool special) {
-  // tokenize
-  int nTokens;
-  final promptPtr = input.toNativeUtf8().cast<Char>();
   try {
-    nTokens = _bindings.llama_tokenize(model, promptPtr, input.length, nullptr, 0, true, true);
-  } finally {
-    malloc.free(promptPtr);
-  }
+    final promptPtr = input.toNativeUtf8().cast<Char>();
 
-  Pointer<llama_token> tokens = malloc<llama_token>(nTokens);
-  if (nTokens < 0) {
-    throw LlmException("Failed to tokenize prompt!");
-  }
-  llama_batch batch = _bindings.llama_batch_get_one(tokens, nTokens);
+    try {
+      int nTokens = -_bindings.llama_tokenize(model, promptPtr, input.length, nullptr, 0, special, special);
+      if (nTokens < 0) {
+        throw LlmException("Couldn't parse tokens for prompt $input");
+      }
 
-  if (tokens != nullptr) {
-    malloc.free(tokens);
-  }
+      final tokens = malloc<llama_token>(nTokens);
+      try {
+        nTokens = _bindings.llama_tokenize(model, promptPtr, input.length, tokens, nTokens, special, special);
+        if (nTokens < 0) {
+          throw LlmException('Tokenization failed');
+        }
 
-  return batch;
+        return _bindings.llama_batch_get_one(tokens, nTokens);
+      } finally {
+        malloc.free(tokens);
+      }
+    } finally {
+      malloc.free(promptPtr);
+    }
+  } catch (e) {
+    throw LlmException("Caught an exception while handling the prompt.", e);
+  }
 }
 
-class Llama {
+class Llama implements Iterator<String> {
   late final Pointer<llama_model> model;
   late final Pointer<llama_sampler> sampler;
   late final Pointer<llama_context> context;
   final bool special;
-  late llama_batch batch;
-  late Pointer<llama_token> tokenPtr;
-  late int last = -1;
+  late llama_batch? batch;
+  late final Pointer<llama_token> tokenPtr;
+  String value = "";
 
 
-  Llama(String modelPath, ModelParams modelParams, ContextParams contextParams, this.special, String input) {
+  Llama(String modelPath, ModelParams modelParams, ContextParams contextParams, this.special) {
     init();
 
     model = loadModel(modelPath, modelParams.get());
@@ -74,42 +80,45 @@ class Llama {
     sampler = _bindings.llama_sampler_chain_init(getDefaultSamplerChainParams());
     _bindings.llama_sampler_chain_add(sampler, _bindings.llama_sampler_init_greedy());
     tokenPtr = malloc<llama_token>();
+  }
+
+  void setInput(String input) {
+    malloc.free(tokenPtr);
+
+    if (input.isEmpty) {
+      throw LlmException("Can't set an empty input!");
+    }
+
     batch = prompt(model, input, special);
   }
 
-  bool hasNext() {
-    return last != -1 && _bindings.llama_token_eos(model) == last;
-  }
+  @override
+  bool moveNext() {
+    if (batch == null) {
+      throw LlmException("Set an input first!");
+    }
 
-  String? next() {
-    last = _bindings.llama_sampler_sample(sampler, context, -1);
+    if (_bindings.llama_decode(context, batch!) != 0) {
+      throw LlmException("Couldn't evaluate!");
+    }
 
-    if (_bindings.llama_token_eos(model) == last) {
-      return null;
+    int token = _bindings.llama_sampler_sample(sampler, context, -1);
+
+    if (_bindings.llama_token_eos(model) == token) {
+      return false;
     } else {
+      // get string from token
       final buf = malloc<Char>(256);
-      int n = _bindings.llama_token_to_piece(model, last, buf, 256, 0, special);
-      String r = String.fromCharCodes(buf.cast<Uint8>().asTypedList(n));
-      tokenPtr.value = last;
+      int n = _bindings.llama_token_to_piece(model, token, buf, 256, 0, special);
+      value = String.fromCharCodes(buf.cast<Uint8>().asTypedList(n));
+      tokenPtr.value = token;
       batch = _bindings.llama_batch_get_one(tokenPtr, 1);
-      return r;
+      return true;
     }
   }
 
-  Stream<String> stream() async* {
-    try {
-      while (hasNext()) {
-        String? t = next();
-        if (t != null) {
-          yield t;
-        } else {
-          break;
-        }
-      }
-    } catch (e) {
-      throw new LlmException("Caught in stream generation", e);
-    }
-  }
+  @override
+  String get current => value;
 
   void dispose() {
     if (model != nullptr) {
@@ -127,10 +136,6 @@ class Llama {
 
     deInit();
   }
-}
-
-class LlmPrompt {
-
 }
 
 class LlmException implements Exception {

@@ -1,27 +1,40 @@
-import 'package:flutter/material.dart';
-import 'package:texonis_llm/texonis_llm.dart';
 import 'dart:io';
 
-void main() async {
-  String modelPath = "/home/tocraft/Downloads/tinyllama-1.1b-chat-v1.0.Q2_K.gguf";
-  Llama llama = Llama(modelPath, ModelParams(), ContextParams(), false, "A long time ago ");
+import 'package:flutter/material.dart';
+import 'package:texonis_llm/texonis_llm.dart';
 
-  llama.stream().listen((response) {
-    stdout.write(response);
-  });
-
-  //runApp(const MyApp());
+void main() {
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: " Texonis LLM",
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
+        useMaterial3: true,
+      ),
+      home: const MyHomePage(title: "Example for Texonis LLM"),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyAppState extends State<MyApp> {
-  late int sumResult = 0;
+class _MyHomePageState extends State<MyHomePage> {
+  final enteredTextController = TextEditingController();
+  final Llama llama = Llama("/home/tocraft/Downloads/DistilGPT2-TinyStories.IQ3_M.gguf", ModelParams(), ContextParams(), true);
+  String output = "";
 
   @override
   void initState() {
@@ -29,37 +42,53 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
+  void dispose() {
+    enteredTextController.dispose();
+    super.dispose();
+  }
+
+  void generate() {
+    llama.setInput(enteredTextController.text);
+    while(llama.moveNext()) {
+      output += llama.current;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(fontSize: 25);
-    const spacerSmall = SizedBox(height: 10);
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Native Packages'),
-        ),
-        body: SingleChildScrollView(
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              children: [
-                const Text(
-                  'This calls a native function through FFI that is shipped as source in the package. '
-                  'The native code is built as part of the Flutter Runner build.',
-                  style: textStyle,
-                  textAlign: TextAlign.center,
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor:
+        ColorScheme.fromSeed(seedColor: Colors.lightGreen).inversePrimary,
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+              child: TextFormField(
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(),
+                  labelText: 'Enter text',
                 ),
-                spacerSmall,
-                Text(
-                  'sum(1, 2) = $sumResult',
-                  style: textStyle,
-                  textAlign: TextAlign.center,
-                ),
-                spacerSmall
-              ],
+                controller: enteredTextController
+              ),
             ),
-          ),
+            const Text("Press the button to generate"),
+            SelectableText(
+              output,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+          ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: generate,
+        tooltip: 'Generate',
+        child: const Icon(Icons.generating_tokens_outlined),
+      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
